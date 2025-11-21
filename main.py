@@ -33,13 +33,11 @@ class Game:
         self.player["y"] = max(0, min(HEIGHT-1, self.player["y"] + self.player["vy"]))
 
     def update_real(self):
-        # activer un portail proche
         for p in self.portals:
             if not p["purified"] and self.dist(self.player, p) < 6:
                 if pyxel.btnp(pyxel.KEY_SPACE):
                     self.start_ritual()
 
-        # progression du rituel -> transition
         if self.ritual_active:
             self.ritual_progress += 1
             if self.ritual_progress % 10 == 0:
@@ -48,13 +46,11 @@ class Game:
                 self.enter_spirit()
 
     def update_spirit(self):
-        # drain de foi pendant la connexion
         if pyxel.frame_count % 30 == 0:
             self.player["faith"] = max(0, self.player["faith"] - 2)
             if self.player["faith"] == 0:
                 self.exit_spirit(failed=True)
 
-        # simple IA monstre
         for m in self.monsters:
             dx = 1 if self.player["x"] > m["x"] else -1
             dy = 1 if self.player["y"] > m["y"] else -1
@@ -63,12 +59,10 @@ class Game:
             if self.dist(self.player, m) < 5:
                 self.player["hp"] = max(0, self.player["hp"] - 1)
 
-        # purification des nœuds
         all_purified = all(n["purified"] for n in self.spirit_nodes) if self.spirit_nodes else False
         if all_purified:
             self.exit_spirit(failed=False)
 
-        # attaque simple
         if pyxel.btnp(pyxel.KEY_Z):
             for m in self.monsters:
                 if self.dist(self.player, m) < 8:
@@ -82,7 +76,6 @@ class Game:
     def enter_spirit(self):
         self.state = STATE_SPIRIT
         self.ritual_active = False
-        # générer nœuds et monstres
         self.spirit_nodes = [{"x": 30, "y": 30, "purified": False},
                              {"x": 96, "y": 40, "purified": False}]
         self.monsters = [{"x": 10, "y": 10, "hp": 2, "spd": 0.5},
@@ -90,9 +83,7 @@ class Game:
 
     def exit_spirit(self, failed):
         self.state = STATE_REAL
-        # marquer le portail purifié si réussi
         if not failed:
-            # purifie le premier portail non purifié
             for p in self.portals:
                 if not p["purified"]:
                     p["purified"] = True
@@ -106,10 +97,9 @@ class Game:
             self.draw_real()
         else:
             self.draw_spirit()
-        self.draw_ui()
+        self.draw_ui()  
 
     def draw_real(self):
-        # monde réel: couleurs froides
         for p in self.portals:
             col = 11 if p["purified"] else 2
             pyxel.circ(p["x"], p["y"], 3, col)
@@ -119,7 +109,6 @@ class Game:
             pyxel.text(5, 5, "Rituel...", 10)
 
     def draw_spirit(self):
-        # monde d'esprit: palette vibrante
         pyxel.rect(0, 0, WIDTH, HEIGHT, 5)
         for n in self.spirit_nodes:
             col = 10 if n["purified"] else 8
@@ -128,8 +117,13 @@ class Game:
             pyxel.circ(m["x"], m["y"], 3, 3)
         pyxel.circ(self.player["x"], self.player["y"], 3, 14)
 
+    def draw_ui(self):
+        pyxel.text(5, HEIGHT-15, f"HP: {self.player['hp']}", 7)
+        pyxel.text(50, HEIGHT-15, f"Faith: {self.player['faith']}", 7)
+
     @staticmethod
     def dist(a, b):
         return ((a["x"] - b["x"])**2 + (a["y"] - b["y"])**2) ** 0.5
 
 Game()
+
