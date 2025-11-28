@@ -2,14 +2,16 @@ import pyxel
 import math
 import random
 
-WIDTH, HEIGHT = 128, 128
+WIDTH, HEIGHT = 256, 256
 
 STATE_REAL = 0
 STATE_SPIRIT = 1
 
 class Game:
     def __init__(self):
-        pyxel.init(WIDTH, HEIGHT, title="Broken Places")
+        pyxel.init(WIDTH, HEIGHT, title="Broken Places", fps= 30, quit_key= pyxel.KEY_RCTRL, display_scale= 3)
+        pyxel.load("5.pyxres")
+        pyxel.mouse(True)
 
         # Player
         self.player = {
@@ -19,12 +21,13 @@ class Game:
             "vy": 0,
             "hp": 5,
             "faith": 100,
-            "anim": 0  # animation frame
+            "anim": 0,  # animation frame
+            "immortality": False,
+            "immortality_start_frame": 0
         }
 
         # World
         self.state = STATE_REAL
-        self.frame = 0
         self.portals = [
             {"x": 32, "y": 32, "purified": False},
             {"x": 96, "y": 96, "purified": False}
@@ -48,7 +51,6 @@ class Game:
     # ============================================================
 
     def update(self):
-        self.frame += 1
         self.update_player()
 
         if self.state == STATE_REAL:
@@ -57,18 +59,21 @@ class Game:
             self.update_spirit()
 
     def update_player(self):
-        move = (pyxel.btn(pyxel.KEY_RIGHT) - pyxel.btn(pyxel.KEY_LEFT),
-                pyxel.btn(pyxel.KEY_DOWN) - pyxel.btn(pyxel.KEY_UP))
+        move = ((pyxel.btn(pyxel.KEY_D) or pyxel.btn(pyxel.KEY_RIGHT)) - (pyxel.btn(pyxel.KEY_Q) or pyxel.btn(pyxel.KEY_LEFT)),
+                (pyxel.btn(pyxel.KEY_S) or pyxel.btn(pyxel.KEY_DOWN)) - (pyxel.btn(pyxel.KEY_Z) or pyxel.btn(pyxel.KEY_UP)))
 
         self.player["vx"] = move[0] * 1.5
         self.player["vy"] = move[1] * 1.5
 
         self.player["x"] = max(0, min(WIDTH, self.player["x"] + self.player["vx"]))
         self.player["y"] = max(0, min(HEIGHT, self.player["y"] + self.player["vy"]))
+        
+        if self.player["immortality"]==True and pyxel.frame_count-self.player["immortality_start_frame"]>15:
+            self.player["immortality"]= False
 
         # animation du joueur
         if move != (0, 0):
-            if self.frame % 10 == 0:
+            if pyxel.frame_count % 10 == 0:
                 self.player["anim"] = 1 - self.player["anim"]
 
     # ============================================================
@@ -106,17 +111,29 @@ class Game:
     def update_spirit(self):
 
         # Perte de foi progressive
-        if self.frame % 30 == 0:
+        if pyxel.frame_count % 30 == 0:
             self.player["faith"] -= 2
             if self.player["faith"] <= 0:
                 self.exit_spirit(failed=True)
 
         # -------------------------------
-        # ATTAQUE À DISTANCE (Z)
+        # ATTAQUE À DISTANCE (LEFT CLICK)
         # -------------------------------
-        if pyxel.btnp(pyxel.KEY_Z):
-            dx = (pyxel.btn(pyxel.KEY_RIGHT) - pyxel.btn(pyxel.KEY_LEFT))
-            dy = (pyxel.btn(pyxel.KEY_DOWN) - pyxel.btn(pyxel.KEY_UP))
+        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+            dif_x= (self.player["x"])-pyxel.mouse_x
+            dif_y= (self.player["y"])-pyxel.mouse_y
+            if dif_x==0:
+                dx= 0
+                dy= -dif_y/abs(dif_x)
+            elif dif_y==0:
+                dx= -dif_x/abs(dif_y)
+                dy=0
+            elif abs(dif_x) > abs(dif_y):
+                dx= -dif_x/abs(dif_x)
+                dy= -dif_y/abs(dif_x)
+            else:
+                dx= -dif_x/abs(dif_y)
+                dy= -dif_y/abs(dif_y)
 
             # défaut : tir vers la droite
             if dx == 0 and dy == 0:
@@ -148,11 +165,14 @@ class Game:
             m["x"] += dx * m["spd"]
             m["y"] += dy * m["spd"]
 
-            m["anim"] = (self.frame // 10) % 2
+            m["anim"] = (pyxel.frame_count // 10) % 2
 
             # contact joueur
             if self.dist(self.player, m) < 6:
-                self.player["hp"] -= 1
+                if self.player["immortality"]==False:
+                    self.player["hp"] -= 1
+                    self.player["immortality"]=True
+                    self.player["immortality_start_frame"]= pyxel.frame_count
 
         # -------------------------------
         # COLLISIONS projectile → monstre
@@ -213,6 +233,7 @@ class Game:
         self.state = STATE_SPIRIT
         self.ritual_active = False
         self.ritual_progress = 0
+        self.player["immortality"]= True
 
         # Noeuds à purifier
         self.spirit_nodes = [
@@ -269,7 +290,7 @@ class Game:
         # Aura animée autour des portails
         for p in self.portals:
             if not p["purified"]:
-                r = 6 + (self.frame % 8)
+                r = 6 + (pyxel.frame_count % 8)
                 pyxel.circ(p["x"], p["y"], r, 13)
 
         # Portails
@@ -279,7 +300,8 @@ class Game:
 
         # Joueur animé
         col = 7 if self.player["anim"] == 0 else 10
-        pyxel.circ(self.player["x"], self.player["y"], 3, col)
+        #pyxel.circ(self.player["x"], self.player["y"], 3, col)
+        pyxel.blt(self.player["x"]-4, self.player["y"]-4, 0, 40, 0, 8, 8, 7)
 
         # Rituel visuel
         if self.ritual_active:
@@ -291,7 +313,7 @@ class Game:
 
     def draw_spirit(self):
         # Fond pulsant
-        c = 5 + (self.frame % 20) // 5
+        c = 5 + (pyxel.frame_count % 20) // 5
         pyxel.cls(c)
 
         # Noeuds spirituels
@@ -314,7 +336,8 @@ class Game:
 
         # Joueur
         col = 14 if self.player["anim"] == 0 else 7
-        pyxel.circ(self.player["x"], self.player["y"], 3, col)
+        #pyxel.circ(self.player["x"], self.player["y"], 3, col)
+        pyxel.blt(self.player["x"]-8, self.player["y"]-8, 1, 80, 0, 16, 16, 7)
 
     # -------------------------------
 
@@ -333,4 +356,5 @@ class Game:
 
 
 Game()
+
 
