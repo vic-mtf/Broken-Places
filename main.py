@@ -64,9 +64,9 @@ class Game:
 
         self.player["vx"] = move[0] * 1.5
         self.player["vy"] = move[1] * 1.5
-
-        self.player["x"] = max(0, min(WIDTH, self.player["x"] + self.player["vx"]))
-        self.player["y"] = max(0, min(HEIGHT, self.player["y"] + self.player["vy"]))
+        #                                      v : 512 taille de la map
+        self.player["x"] = max(-WIDTH//2, min(512, self.player["x"] + self.player["vx"]))
+        self.player["y"] = max(-HEIGHT//2, min(512, self.player["y"] + self.player["vy"]))
         
         if self.player["immortality"]==True and pyxel.frame_count-self.player["immortality_start_frame"]>15:
             self.player["immortality"]= False
@@ -286,26 +286,28 @@ class Game:
 
     def draw_real(self):
         pyxel.cls(1)
+        
+        pyxel.bltm(0, 0, 0, self.player["x"], self.player["y"], 256, 256)
 
         # Aura animée autour des portails
         for p in self.portals:
             if not p["purified"]:
                 r = 6 + (pyxel.frame_count % 8)
-                pyxel.circ(p["x"], p["y"], r, 13)
+                pyxel.circ(p["x"]-self.player["x"]+WIDTH//2, p["y"]-self.player["y"]+HEIGHT//2, r, 13)
 
         # Portails
         for p in self.portals:
             col = 11 if p["purified"] else 2
-            pyxel.circ(p["x"], p["y"], 3, col)
+            pyxel.circ(p["x"]-self.player["x"]+WIDTH//2, p["y"]-self.player["y"]+HEIGHT//2, 3, col)
 
         # Joueur animé
         col = 7 if self.player["anim"] == 0 else 10
         #pyxel.circ(self.player["x"], self.player["y"], 3, col)
-        pyxel.blt(self.player["x"]-4, self.player["y"]-4, 0, 40, 0, 8, 8, 7)
+        pyxel.blt(WIDTH//2-4, HEIGHT//2-4, 0, 40, 0, 8, 8, 7)
 
         # Rituel visuel
         if self.ritual_active:
-            pyxel.circb(self.player["x"], self.player["y"],
+            pyxel.circb(WIDTH//2, HEIGHT//2,
                         20 - self.ritual_progress // 3,
                         10)
 
@@ -356,5 +358,6 @@ class Game:
 
 
 Game()
+
 
 
