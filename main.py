@@ -15,8 +15,8 @@ class Game:
 
         # Player
         self.player = {
-            "x": 64,
-            "y": 64,
+            "x": 360,
+            "y": 600,
             "vx": 0,
             "vy": 0,
             "hp": 5,
@@ -32,6 +32,15 @@ class Game:
             {"x": 32, "y": 32, "purified": False},
             {"x": 96, "y": 96, "purified": False}
         ]
+        self.tree_id= {"1": 0, "2": 16, "3": 32, "4": 48, "5": 64, "6": 80}
+        self.trees= []
+        for i in range(336, 1560):
+            self.trees+= [[]]
+        for tile_y in range(240):
+            for tile_x in range(200):
+                if pyxel.tilemaps[0].pget(tile_x, tile_y)==(31,30):
+                    for i in range(1):
+                        self.trees[tile_y*8+random.randint(1,7)-336]+= [[tile_x*8+random.randint(1,7), str(random.randint(1,6))]]
 
         # Spirit world
         self.spirit_nodes = []
@@ -52,6 +61,7 @@ class Game:
 
     def update(self):
         self.update_player()
+        print(self.player["x"], self.player["y"])
 
         if self.state == STATE_REAL:
             self.update_real()
@@ -62,15 +72,18 @@ class Game:
         move = ((pyxel.btn(pyxel.KEY_D) or pyxel.btn(pyxel.KEY_RIGHT)) - (pyxel.btn(pyxel.KEY_Q) or pyxel.btn(pyxel.KEY_LEFT)),
                 (pyxel.btn(pyxel.KEY_S) or pyxel.btn(pyxel.KEY_DOWN)) - (pyxel.btn(pyxel.KEY_Z) or pyxel.btn(pyxel.KEY_UP)))
 
-        self.player["vx"] = move[0] * 1.5
-        self.player["vy"] = move[1] * 1.5
-        #                                      v : 512 taille de la map
-        self.player["x"] = max(-WIDTH//2, min(512, self.player["x"] + self.player["vx"]))
-        self.player["y"] = max(-HEIGHT//2, min(512, self.player["y"] + self.player["vy"]))
+        self.player["vx"] = move[0] * 1
+        self.player["vy"] = move[1] * 1
+        #                                      v : taille de la map
+        self.player["x"] = max(-WIDTH//2, min(1596, self.player["x"] + self.player["vx"]))
+        self.player["y"] = max(-HEIGHT//2, min(1916, self.player["y"] + self.player["vy"]))
         
         if self.player["immortality"]==True and pyxel.frame_count-self.player["immortality_start_frame"]>15:
             self.player["immortality"]= False
-
+        
+        #print(pyxel.tilemaps[0].pget(self.player["x"]//8+16, self.player["y"]//8+16))
+        
+        
         # animation du joueur
         if move != (0, 0):
             if pyxel.frame_count % 10 == 0:
@@ -273,21 +286,32 @@ class Game:
     # ============================================================
     # DRAW
     # ============================================================
-
+    
+    
     def draw(self):
         if self.state == STATE_REAL:
             self.draw_real()
+            
         else:
             self.draw_spirit()
 
         self.draw_ui()
 
     # -------------------------------
+    
+    def draw_tree_and_player(self):
+        print(len(self.trees))
+        for y in range(len(self.trees)):
+            for tree in self.trees[y]:
+                pyxel.blt(tree[0]-self.player["x"]-8, y+336-self.player["y"]-8, 0, 240, self.tree_id[tree[1]], 16, 16, 7)
+        pyxel.blt(WIDTH//2-4, HEIGHT//2-4, 0, 40, 0, 8, 8, 7)
+            
+    # -------------------------------
 
     def draw_real(self):
         pyxel.cls(1)
         
-        pyxel.bltm(0, 0, 0, self.player["x"], self.player["y"], 256, 256)
+        pyxel.bltm(0, 0, 0, self.player["x"], self.player["y"], WIDTH, HEIGHT)
 
         # Aura animée autour des portails
         for p in self.portals:
@@ -300,16 +324,20 @@ class Game:
             col = 11 if p["purified"] else 2
             pyxel.circ(p["x"]-self.player["x"]+WIDTH//2, p["y"]-self.player["y"]+HEIGHT//2, 3, col)
 
+        # Arbres
+        self.draw_tree_and_player()
+
         # Joueur animé
-        col = 7 if self.player["anim"] == 0 else 10
+        #col = 7 if self.player["anim"] == 0 else 10
         #pyxel.circ(self.player["x"], self.player["y"], 3, col)
-        pyxel.blt(WIDTH//2-4, HEIGHT//2-4, 0, 40, 0, 8, 8, 7)
+        #pyxel.blt(WIDTH//2-4, HEIGHT//2-4, 0, 40, 0, 8, 8, 7)
 
         # Rituel visuel
         if self.ritual_active:
             pyxel.circb(WIDTH//2, HEIGHT//2,
                         20 - self.ritual_progress // 3,
                         10)
+        
 
     # -------------------------------
 
