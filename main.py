@@ -17,6 +17,8 @@ class Game:
         self.player = {
             "x": 800,
             "y": 1200,
+            "x_spirit": 100,
+            "y_spirit": 100,
             "vx": 0,
             "vy": 0,
             "hp": 5,
@@ -133,22 +135,36 @@ class Game:
         move = ((pyxel.btn(pyxel.KEY_D) or pyxel.btn(pyxel.KEY_RIGHT)) - (pyxel.btn(pyxel.KEY_Q) or pyxel.btn(pyxel.KEY_LEFT)),
                 (pyxel.btn(pyxel.KEY_S) or pyxel.btn(pyxel.KEY_DOWN)) - (pyxel.btn(pyxel.KEY_Z) or pyxel.btn(pyxel.KEY_UP)))
         
-        tile_of_player= pyxel.tilemaps[0].pget((self.player["x"]+move[0]* 2)//8+16, (self.player["y"]+move[1]* 2)//8+16)
+        if self.state == STATE_REAL:
+            player_x= self.player["x"]
+            player_y= self.player["y"]
+        else:
+            player_x= self.player["x_spirit"]
+            player_y= self.player["y_spirit"]
         
-        #print(tile_of_player, ((self.player["x"]+move[0] * 2)%8, (self.player["y"]+move[1] * 2)%8),pyxel.image(0).pget(tile_of_player[0]*8+self.player["x"]%8+move[0] * 1, tile_of_player[1]*8+self.player["y"]%8+move[1] * 1))
+        tile_of_player= pyxel.tilemaps[0].pget((player_x+move[0]* 2)//8+16, (player_y+move[1]* 2)//8+16)
+        
+        #print(tile_of_player, ((player_x+move[0] * 2)%8, (self.player["y"]+move[1] * 2)%8),pyxel.image(0).pget(tile_of_player[0]*8+player_x%8+move[0] * 1, tile_of_player[1]*8+self.player["y"]%8+move[1] * 1))
 
         for type_of_tile in self.tile_type:
             if self.tile_id_collision[type_of_tile].count(tile_of_player)==1:
                 if self.tile_type[type_of_tile]!=None:
-                    if self.tile_type[type_of_tile].count(pyxel.image(0).pget(tile_of_player[0]*8+(self.player["x"]+move[0] * 2)%8+move[0] * 1, tile_of_player[1]*8+(self.player["y"]+move[1] * 2)%8+move[1] * 1))==1:
+                    if self.tile_type[type_of_tile].count(pyxel.image(0).pget(tile_of_player[0]*8+(player_x+move[0] * 2)%8+move[0] * 1, tile_of_player[1]*8+(player_y+move[1] * 2)%8+move[1] * 1))==1:
                         move= (0,0)
                         
         
         self.player["vx"] = move[0] * 5
         self.player["vy"] = move[1] * 5
-        #                                      v : taille de la map
-        self.player["x"] = max(-WIDTH//2, min(1596, self.player["x"] + self.player["vx"]))
-        self.player["y"] = max(-HEIGHT//2, min(1916, self.player["y"] + self.player["vy"]))
+        
+        if self.state == STATE_REAL:
+            #                                      v : taille de la map
+            self.player["x"] = max(-WIDTH//2, min(1596, player_x + self.player["vx"]))
+            self.player["y"] = max(-HEIGHT//2, min(1916, player_y + self.player["vy"]))
+        else:
+            #                                      v : taille de la map
+            self.player["x_spirit"] = max(-WIDTH//2, min(1596, player_x + self.player["vx"]))
+            self.player["y_spirit"] = max(-HEIGHT//2, min(1916, player_y + self.player["vy"]))
+        
         
         if self.player["immortality"]==True and pyxel.frame_count-self.player["immortality_start_frame"]>15:
             self.player["immortality"]= False
@@ -206,8 +222,8 @@ class Game:
         # ATTAQUE À DISTANCE (LEFT CLICK)
         # -------------------------------
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            dif_x= (self.player["x"])-pyxel.mouse_x
-            dif_y= (self.player["y"])-pyxel.mouse_y
+            dif_x= (self.player["x_spirit"])-pyxel.mouse_x
+            dif_y= (self.player["y_spirit"])-pyxel.mouse_y
             if dif_x==0:
                 dx= 0
                 dy= -dif_y/abs(dif_x)
@@ -226,8 +242,8 @@ class Game:
                 dx = 1
 
             self.projectiles.append({
-                "x": self.player["x"],
-                "y": self.player["y"],
+                "x": self.player["x_spirit"],
+                "y": self.player["y_spirit"],
                 "dx": dx,
                 "dy": dy,
                 "spd": 3,
@@ -246,15 +262,15 @@ class Game:
         # MONSTRES → mouvement + contact
         # -------------------------------
         for m in self.monsters:
-            dx = 1 if self.player["x"] > m["x"] else -1
-            dy = 1 if self.player["y"] > m["y"] else -1
+            dx = 1 if self.player["x_spirit"] > m["x"] else -1
+            dy = 1 if self.player["y_spirit"] > m["y"] else -1
             m["x"] += dx * m["spd"]
             m["y"] += dy * m["spd"]
 
             m["anim"] = (pyxel.frame_count // 10) % 2
 
             # contact joueur
-            if self.dist(self.player, m) < 6:
+            if self.dist(self.player, m, "x_spirit", "y_spirit") < 6:
                 if self.player["immortality"]==False:
                     self.player["hp"] -= 1
                     self.player["immortality"]=True
@@ -278,7 +294,7 @@ class Game:
         # PURIFICATION DES NŒUDS SPIRITUELS
         # -------------------------------
         for n in self.spirit_nodes:
-            if not n["purified"] and self.dist(self.player, n) < 8:
+            if not n["purified"] and self.dist(self.player, n, "x_spirit", "y_spirit") < 8:
                 if pyxel.btnp(pyxel.KEY_SPACE):
                     n["purified"] = True
                     self.spawn_hit_particles(n["x"], n["y"])
@@ -471,7 +487,7 @@ class Game:
         # Joueur
         col = 14 if self.player["anim"] == 0 else 7
         #pyxel.circ(self.player["x"], self.player["y"], 3, col)
-        pyxel.blt(self.player["x"]-8, self.player["y"]-8, 1, 80, 0, 16, 16, 7)
+        pyxel.blt(self.player["x_spirit"]-8, self.player["y_spirit"]-8, 1, 80, 0, 16, 16, 7)
 
     # -------------------------------
 
@@ -485,8 +501,8 @@ class Game:
     # -------------------------------
 
     @staticmethod
-    def dist(a, b):
-        return ((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2) ** 0.5
+    def dist(a, b, base_x= "x", base_y= "y"):
+        return ((a[base_x] - b["x"]) ** 2 + (a[base_y] - b["y"]) ** 2) ** 0.5
 
 
 Game()
