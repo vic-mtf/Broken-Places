@@ -259,7 +259,7 @@ class Game:
                     dy= -dif_y/abs(dif_y)
                 elif dif_y==0:
                     dx= -dif_x/abs(dif_x)
-z                    dy=0
+                    dy=0
                 elif abs(dif_x) > abs(dif_y):
                     dx= -dif_x/abs(dif_x)
                     dy= -dif_y/abs(dif_x)
