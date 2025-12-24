@@ -17,8 +17,8 @@ class Game:
 
         # Player
         self.player = {
-            "x": 156*8-128,
-            "y": 200*8-128,
+            "x": 18*8, #156*8-128,
+            "y": 52*8, #200*8-128,
             "x_spirit": 100,
             "y_spirit": 100,
             "vx": 0,
@@ -33,8 +33,8 @@ class Game:
             "cooldown": False,
             "cooldown_start_frame": 0,
             "active_attack": None,
-            "slot_at_mouse": [None, None],
-            "selected_slot": [None, None]
+            "slot_at_mouse": [None, None], # [ui_of_slot, slot_id]
+            "selected_slot": [None, None]  # [ui_of_slot, slot_id]
         }
 
         # World
@@ -87,6 +87,9 @@ class Game:
         self.cactus_id= {"1": 96}
         self.rock_id= {"1": 64, "2": 72, "3": 80, "4": 88}
         self.bush_id= {"1": 64, "2": 72, "3": 80, "4": 88}
+        self.snow_tree_id= {"1": 0, "2": 16, "3": 32}
+        self.snow_bush_id= {"1": 0, "2": 8, "3": 16, "4": 24}
+        self.snow_rock_id= {"1": 0, "2": 8, "3": 16, "4": 24}
         self.props= []
         for i in range(1736):
             self.props+= [[]]
@@ -116,6 +119,20 @@ class Game:
                 elif pyxel.tilemaps[0].pget(tile_x, tile_y)==(30,30):
                     for i in range(random.choice([0,0,0,0,0,0,0,0,0,0,1])):
                         self.props[tile_y*8+random.randint(1,7)]+= [["cactus", tile_x*8+random.randint(1,7), str(random.randint(1,1))]]
+                        
+                elif pyxel.tilemaps[0].pget(tile_x, tile_y)==(30,28):
+                    for i in range(random.choice([0,0,0,0,0,0,1])):
+                        self.props[tile_y*8+random.randint(1,7)]+= [["mountain", tile_x*8+random.randint(1,7), str(random.randint(1,1))]]
+                        
+                elif pyxel.tilemaps[0].pget(tile_x, tile_y)==(31,28):
+                    for i in range(random.choice([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1])):
+                        tmp= random.randint(1, 3)
+                        if tmp==1:
+                            self.props[tile_y*8+random.randint(1,7)]+= [["snow_tree", tile_x*8+random.randint(1,7), str(random.randint(1,3))]]
+                        elif tmp==2:
+                            self.props[tile_y*8+random.randint(1,7)]+= [["snow_bush", tile_x*8+random.randint(1,7), str(random.randint(1,4))]]
+                        else:
+                            self.props[tile_y*8+random.randint(1,7)]+= [["snow_rock", tile_x*8+random.randint(1,7), str(random.randint(1,4))]]
         
         
 
@@ -422,8 +439,8 @@ class Game:
 
         # Monstres animés
         self.monsters = [
-            {"x": 20, "y": 20, "hp": 3, "spd": 0.5, "anim": 0},
-            {"x": 110, "y": 100, "hp": 4, "spd": 0.6, "anim": 0}
+            {"x": 20, "y": 20, "hp": 3, "spd": 0.5, "anim": 0, "stun": False, "stun_start_frame": 0, "stun_type": None},
+            {"x": 110, "y": 100, "hp": 4, "spd": 0.6, "anim": 0, "stun": False, "stun_start_frame": 0, "stun_type": None}
         ]
 
     def exit_spirit(self, failed):
@@ -478,8 +495,16 @@ class Game:
                     pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"], 0, self.bush_id[prop[2]], 112, 8, 8, 7)
                 elif prop[0]=="rock":
                     pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"], 0, self.rock_id[prop[2]], 120, 8, 8, 7)
+                elif prop[0]=="snow_tree":
+                    pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"]-10, 0, 16, self.snow_tree_id[prop[2]], 16, 16, 15)
+                elif prop[0]=="snow_bush":
+                    pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"], 0, 32, self.snow_bush_id[prop[2]], 8, 8, 15)
+                elif prop[0]=="snow_rock":
+                    pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"], 0, 40, self.snow_rock_id[prop[2]], 8, 8, 15)
                 elif prop[0]=="cactus":
                     pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"]-10, 0, 240, self.cactus_id[prop[2]], 16, 16, 7)
+                elif prop[0]=="mountain":
+                    pyxel.blt(prop[1]-self.player["x"]-8, y-self.player["y"]-10, 2, 112, 0, 64, 32, 2)
                 elif prop[0]=="player":
                     pyxel.blt(prop[1], y-self.player["y"], 0, 48, 0, 8, 8, 7)
         self.props[self.player["y"]+124].pop()
