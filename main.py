@@ -155,15 +155,14 @@ class Game:
             player_x= self.player["x_spirit"]
             player_y= self.player["y_spirit"]
         
-        tile_of_player= pyxel.tilemaps[0].pget((player_x+move[0]* 2)//8+16, (player_y+move[1]* 2)//8+16)
-        
-        #print(tile_of_player, ((player_x+move[0] * 2)%8, (self.player["y"]+move[1] * 2)%8),pyxel.image(0).pget(tile_of_player[0]*8+player_x%8+move[0] * 1, tile_of_player[1]*8+self.player["y"]%8+move[1] * 1))
-
-        for type_of_tile in self.tile_type:
-            if self.tile_id_collision[type_of_tile].count(tile_of_player)==1:
-                if self.tile_type[type_of_tile]!=None:
-                    if self.tile_type[type_of_tile].count(pyxel.image(0).pget(tile_of_player[0]*8+(player_x+move[0] * 2)%8+move[0] * 1, tile_of_player[1]*8+(player_y+move[1] * 2)%8+move[1] * 1))==1:
-                        move= (0,0)
+        #temporary if statement for something that I didn't write yet
+        if self.state==STATE_REAL:
+            tile_of_player= pyxel.tilemaps[0].pget((player_x+move[0]* 2)//8+16, (player_y+move[1]* 2)//8+16)
+            for type_of_tile in self.tile_type:
+                if self.tile_id_collision[type_of_tile].count(tile_of_player)==1:
+                    if self.tile_type[type_of_tile]!=None:
+                        if self.tile_type[type_of_tile].count(pyxel.image(0).pget(tile_of_player[0]*8+(player_x+move[0] * 2)%8+move[0] * 1, tile_of_player[1]*8+(player_y+move[1] * 2)%8+move[1] * 1))==1:
+                            move= (0,0)
                         
         
         self.player["vx"] = move[0] * 1
