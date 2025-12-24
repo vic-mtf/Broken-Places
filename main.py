@@ -182,7 +182,7 @@ class Game:
         
         if self.player["immortality"]==True and pyxel.frame_count-self.player["immortality_start_frame"]>15:
             self.player["immortality"]= False
-        
+
         if self.player["cooldown"]==True and pyxel.frame_count-self.player["cooldown_start_frame"]>6:
             self.player["cooldown"]= False
         else:
@@ -211,6 +211,8 @@ class Game:
                             slot_at_mouse_id, slot_at_mouse_in= self.player["slot_at_mouse"][1], self.player["slot_at_mouse"][0]
                             self.player[selected_slot_in][selected_slot_id], self.player[slot_at_mouse_in][slot_at_mouse_id]= self.player[slot_at_mouse_in][slot_at_mouse_id], self.player[selected_slot_in][selected_slot_id]
                             self.player["selected_slot"]= [None, None]
+                            if self.player["active_slots"].count(self.player["active_attack"])==0:
+                                self.player["active_attack"]= None
                     break
             
             for i in range(3):
@@ -224,6 +226,8 @@ class Game:
                             slot_at_mouse_id, slot_at_mouse_in= self.player["slot_at_mouse"][1], self.player["slot_at_mouse"][0]
                             self.player[selected_slot_in][selected_slot_id], self.player[slot_at_mouse_in][slot_at_mouse_id]= self.player[slot_at_mouse_in][slot_at_mouse_id], self.player[selected_slot_in][selected_slot_id]
                             self.player["selected_slot"]= [None, None]
+                            if self.player["active_slots"].count(self.player["active_attack"])==0:
+                                self.player["active_attack"]= None
                     break
         
         # animation du joueur
