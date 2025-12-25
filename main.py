@@ -14,6 +14,19 @@ class Game:
         pyxel.mouse(True)
 
         self.hud= None
+        self.settings= False
+        self.pause_ui_text_id= [
+            (107, 48, 29),
+            (72, 48, 35),
+            (72, 40, 63),
+            (72, 40, 23),
+            (116, 40, 19)
+        ]
+        
+        self.ingame_hud= [None, "inventory"]
+        
+        self.pause_sub_hud= [None, "settings", "pause", "pause", "quit_warning"]
+        
 
         # Player
         self.player = {
@@ -154,12 +167,15 @@ class Game:
     # ============================================================
 
     def update(self):
-        self.update_player()
+        if self.ingame_hud.count(self.hud)==1:
+            self.update_player()
 
-        if self.state == STATE_REAL:
-            self.update_real()
+            if self.state == STATE_REAL:
+                self.update_real()
+            else:
+                self.update_spirit()
         else:
-            self.update_spirit()
+            self.update_outofgame_ui()
 
     def update_player(self):
         move = ((pyxel.btn(pyxel.KEY_D) or pyxel.btn(pyxel.KEY_RIGHT)) - (pyxel.btn(pyxel.KEY_Q) or pyxel.btn(pyxel.KEY_LEFT)),
@@ -172,7 +188,7 @@ class Game:
             player_x= self.player["x_spirit"]
             player_y= self.player["y_spirit"]
         
-        #temporary if statement for something that I didn't write yet
+        # temporary if statement for something that I didn't write yet
         if self.state==STATE_REAL:
             tile_of_player= pyxel.tilemaps[0].pget((player_x+move[0]* 2)//8+16, (player_y+move[1]* 2)//8+16)
             for type_of_tile in self.tile_type:
@@ -214,6 +230,14 @@ class Game:
                 self.player["slot_at_mouse"]= [None, None]
                 self.player["selected_slot"]= [None, None]
         
+        if pyxel.btnp(pyxel.KEY_ESCAPE, 15, 1):
+            if self.hud==None:
+                self.hud= "pause"
+            else:
+                self.hud= None
+                self.player["slot_at_mouse"]= [None, None]
+                self.player["selected_slot"]= [None, None]
+        
         if self.hud=="inventory":
             self.player["slot_at_mouse"]= [None, None]
             
@@ -233,7 +257,7 @@ class Game:
                     break
             
             for i in range(3):
-                if pyxel.mouse_x>77+86 and pyxel.mouse_x<94+101 and pyxel.mouse_y>147+i*19 and pyxel.mouse_y<164+i*19:
+                if pyxel.mouse_x>159 and pyxel.mouse_x<177 and pyxel.mouse_y>147+i*19 and pyxel.mouse_y<164+i*19:
                     self.player["slot_at_mouse"]= ["active_slots", i]
                     if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT, 15, 1):
                         if self.player["selected_slot"]==[None, None]:
@@ -251,7 +275,43 @@ class Game:
         if move != (0, 0):
             if pyxel.frame_count % 10 == 0:
                 self.player["anim"] = 1 - self.player["anim"]
-
+    
+    def update_outofgame_ui(self):
+        self.player["selected_slot"]= [None, None]
+        self.player["slot_at_mouse"]= [None, None]
+        if pyxel.btnp(pyxel.KEY_ESCAPE, 15, 1):
+            self.hud= None
+        if self.hud=="pause":
+            for i in range(len(self.pause_ui_text_id)):
+                if pyxel.mouse_x>8 and pyxel.mouse_x<12+self.pause_ui_text_id[i][2] and pyxel.mouse_y>18+i*30 and pyxel.mouse_y<30+i*30:
+                    self.player["slot_at_mouse"]= ["pause", i]
+                    if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT, 15, 1):
+                        if i==0:
+                            self.hud= None
+                            self.player["selected_slot"]= [None, None]
+                            self.player["slot_at_mouse"]= [None, None]
+                        else:
+                            self.player["selected_slot"]= ["pause", i]
+                    break
+                
+            if self.player["selected_slot"]!=[None, None]:
+                self.hud= self.pause_sub_hud[self.player["selected_slot"][1]]
+                self.player["slot_at_mouse"]= [None, None]
+        
+        elif self.hud=="quit_warning":
+            for i in range(2):
+                if pyxel.mouse_x>93+i*48 and pyxel.mouse_x<115+i*48 and pyxel.mouse_y>131 and pyxel.mouse_y<145:
+                    self.player["slot_at_mouse"]= ["quit_warning", i]
+                    if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT, 15, 1):
+                        if i==0:
+                            pyxel.quit()
+                        else:
+                            self.hud="pause"
+                            self.player["selected_slot"]= [None, None]
+                            self.player["slot_at_mouse"]= [None, None]
+                    break
+        
+    
     # ============================================================
     # REAL WORLD
     # ============================================================
@@ -472,11 +532,8 @@ class Game:
     
     
     def draw(self):
-        
         if self.state == STATE_REAL:
-
             self.draw_real()
-            
             
         else:
             self.draw_spirit()
@@ -587,7 +644,7 @@ class Game:
             if self.attack_ui[self.player["active_attack"]]["type"]=="closed":
                 clipping= 0
             
-                if self.player["x_spirit"]>pyxel.mouse_x:
+                if self.player["x_spirit"]>pyxel.mouse_x and self.ingame_hud.count(self.hud)==1:
                     clipping= -16
                 
                 if pyxel.frame_count-self.player["cooldown_start_frame"]<18:
@@ -639,18 +696,85 @@ class Game:
                         pyxel.blt(75+(self.player["slot_at_mouse"][1]%4)*19, 145+(self.player["slot_at_mouse"][1]//4)*19, 2, 0, 128, 24, 24, 4)
                     elif self.player["slot_at_mouse"][0]=="active_slots":
                         pyxel.blt(71+86, 145+self.player["slot_at_mouse"][1]*19, 2, 0, 128, 24, 24, 4)
-        
+            
+            
+            elif self.hud=="pause":
+                pyxel.rect(0, 0, 75, HEIGHT, 0)
+                for i in range(HEIGHT//8):
+                    pyxel.blt(75, 0+i*8, 2, 112, 32, 47, 8, 7)
+                for i in range(len(self.pause_ui_text_id)):
+                    pyxel.blt(10, 20+i*30, 2, self.pause_ui_text_id[i][0], self.pause_ui_text_id[i][1], self.pause_ui_text_id[i][2], 8, 3)
+                if self.player["slot_at_mouse"]!=[None, None]:
+                    slot_id= self.player["slot_at_mouse"][1]
+                    pyxel.rectb(9, 18+slot_id*30, self.pause_ui_text_id[slot_id][2]+3, 13, 5)
+                    pyxel.trib(8, 19+slot_id*30, 8, 29+slot_id*30, 3, 24+slot_id*30, 5)
+                    pyxel.trib(self.pause_ui_text_id[slot_id][2]+12, 19+slot_id*30, self.pause_ui_text_id[slot_id][2]+12, 29+slot_id*30, self.pause_ui_text_id[slot_id][2]+17, 24+slot_id*30, 5)
+                    pyxel.tri(9, 19+slot_id*30, 9, 29+slot_id*30, 4, 24+slot_id*30, 12)
+                    pyxel.tri(self.pause_ui_text_id[slot_id][2]+11, 19+slot_id*30, self.pause_ui_text_id[slot_id][2]+11, 29+slot_id*30, self.pause_ui_text_id[slot_id][2]+16, 24+slot_id*30, 12)
+                    pyxel.rect(9, 19+slot_id*30, self.pause_ui_text_id[slot_id][2]+2, 11, 12)
+                    pyxel.blt(10, 20+slot_id*30, 2, self.pause_ui_text_id[slot_id][0]+64, self.pause_ui_text_id[slot_id][1], self.pause_ui_text_id[slot_id][2], 8, 3)
+            
+            elif self.hud=="quit_warning":
+                pyxel.rect(0, 0, 75, HEIGHT, 0)
+                for i in range(HEIGHT//8):
+                    pyxel.blt(75, 0+i*8, 2, 112, 32, 47, 8, 7)
+                for i in range(len(self.pause_ui_text_id)):
+                    pyxel.blt(10, 20+i*30, 2, self.pause_ui_text_id[i][0], self.pause_ui_text_id[i][1], self.pause_ui_text_id[i][2], 8, 3)
+                    
+                for i in range(12):
+                    pyxel.blt(80+i*8, 104, 2, 184, 0, 8, 8)
+                    pyxel.blt(80+i*8, 112+4*8, 2, 184, 16, 8, 8)
+                    
+                for i in range(4):
+                    pyxel.blt(72, 112+i*8, 2, 176, 8, 8, 8)
+                    pyxel.blt(80+12*8, 112+i*8, 2, 192, 8, 8, 8)
+                    
+                for x in range(2):
+                    for y in range(2):
+                        pyxel.blt(72+x*104, 104+y*40, 2, 176+x*16, 0+y*16, 8, 8, 0)
+                        
+                pyxel.rect(80, 112, 96, 32, 1)
+                
+                pyxel.blt(78, 112, 2, 0, 216, 104, 16, 3)
+                
+                if self.player["slot_at_mouse"]!=[None, None]:
+                    slot_id= self.player["slot_at_mouse"][1]
+                    pyxel.rectb(95+slot_id*48, 132, 16, 13, 5)
+                    pyxel.trib(94+slot_id*48, 133, 94+slot_id*48, 143, 89+slot_id*48, 138, 5)
+                    pyxel.trib(111+slot_id*48, 133, 111+slot_id*48, 143, 116+slot_id*48, 138, 5)
+                    pyxel.tri(95+slot_id*48, 133, 95+slot_id*48, 143, 90+slot_id*48, 138, 12)
+                    pyxel.tri(110+slot_id*48, 133, 110+slot_id*48, 143, 115+slot_id*48, 138, 12)
+                    pyxel.rect(95+slot_id*48, 133, 16, 11, 12)
+                    
+                for i in range(2):
+                    pyxel.blt(96+i*50, 134, 2, 32-16*i, 248, 16-5*i, 8, 15)
+            
+            elif self.hud=="settings":
+                for i in range(20):
+                    pyxel.blt(48+i*8, 48, 2, 184, 0, 8, 8)
+                    pyxel.blt(48+i*8, 56+18*8, 2, 184, 16, 8, 8)
+                    
+                for i in range(18):
+                    pyxel.blt(40, 56+i*8, 2, 176, 8, 8, 8)
+                    pyxel.blt(48+20*8, 56+i*8, 2, 192, 8, 8, 8)
+                    
+                for x in range(2):
+                    for y in range(2):
+                        pyxel.blt(40+x*168, 48+y*152, 2, 176+x*16, 0+y*16, 8, 8, 0)
+                        
+                pyxel.rect(48, 56, 160, 144, 1)
+                    
         for i in range(3):
             attack_name= self.player["active_slots"][i]
             if attack_name!=None:
                 item= self.attack_ui[attack_name]
                 pyxel.blt(WIDTH-93+19*i, HEIGHT-34, 2, item["x"], item["y"], 16, 16, 7)
         
-        if self.state == STATE_SPIRIT:
-            index= (self.player["active_slots"].index(self.player["active_attack"])+pyxel.mouse_wheel)%3
-            pyxel.blt(WIDTH-112-3+self.attack_ui_slot[index][0], HEIGHT-60-3+self.attack_ui_slot[index][1], 2, 0, 128, 24, 24, 4)
+            if self.state == STATE_SPIRIT:
+                index= (self.player["active_slots"].index(self.player["active_attack"])+(pyxel.mouse_wheel*(int(self.ingame_hud.count(self.hud)==1))))%3
+                pyxel.blt(WIDTH-112-3+self.attack_ui_slot[index][0], HEIGHT-60-3+self.attack_ui_slot[index][1], 2, 0, 128, 24, 24, 4)
     
-        #pyxel.text(5, HEIGHT - 15, f"HP:{self.player['hp']}", 7)d
+        #pyxel.text(5, HEIGHT - 15, f"HP:{self.player['hp']}", 7)
         #pyxel.text(50, HEIGHT - 15, f"Faith:{self.player['faith']}", 7)
 
         if self.memory_fragments:
