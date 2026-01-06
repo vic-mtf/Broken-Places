@@ -15,6 +15,7 @@ class Game:
         pyxel.mouse(True)
         self.temp= []
         self.hud= None
+        self.qol_loot_ui= [] #{"type": ..., "obtention_frame": ...}
         self.settings= False
         self.pause_ui_text_id= [
             (107, 48, 29),
@@ -40,15 +41,15 @@ class Game:
             "vy": 0,
             "hp": 100,
             "faith": 100,
-            "inventory": [None, "sword", None, "sword", None, None, None, None, "sword", None, None, None],
-            "active_slots": [None, "light_bulb", "sword"],
+            "inventory": [None, None, None, None, None, None, None, None, None, None, None, None],
+            "active_slots": ["sword", None, None],
             "anim": 0,  # animation frame
             "portal_id": None,
             "immortality": False,
             "immortality_start_frame": 0,
             "cooldown": False,
             "cooldown_start_frame": 0,
-            "active_attack": None,
+            "active_attack": "sword",
             "slot_at_mouse": [None, None], # [ui_of_slot, slot_id]
             "selected_slot": [None, None]  # [ui_of_slot, slot_id]
         }
@@ -57,8 +58,6 @@ class Game:
         self.state = STATE_REAL
         self.state_entry_frame = 0
         self.portals = [
-            {"x": 32, "y": 32, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT},
-            {"x": 96, "y": 96, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT},
             {"x": 144, "y": 416, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT},
             {"x": 123*8-128, "y": 128*8-64, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT},
             {"x": 410, "y": 1304, "purified": False, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
@@ -84,6 +83,10 @@ class Game:
             {"x_real": 454, "y_real": 726, "x": 0, "y": 0, "id": 2},
             {"x_real": 604, "y_real": 460, "x": 0, "y": 0, "id": 3}
         ]
+        self.effect_ui= {
+            "poison_bomb": {"x": 128, "y": 112, "u": 16, "v": 16, "col": 7},
+            "cryogenis": {"x": 192, "y": 88, "u": 16, "v": 16, "col": 0}
+        }
         
         self.attack_ui_slot= [
             (75-56, 82-56),
@@ -91,9 +94,12 @@ class Game:
             (113-56, 82-56)
         ]
         self.attack_ui= {
-            "sword": {"type": "closed", "x": 16, "y": 112},
-            "light_bulb": {"type": "ranged", "x": 0, "y": 112}
+            "sword": {"type": "closed", "x": 16, "y": 112, "zone": 1, "stun_time": 0, "damage_frame": 1},
+            "cryogenis": {"type": "ranged", "x": 0, "y": 112, "zone": 1, "stun_time": 10, "damage_frame": 90},
+            "poison_bomb": {"type": "ranged", "x": 32, "y": 112, "zone": 8, "stun_time": 0, "damage_frame": 24}
         }
+        
+        self.projectile_info_impact= [] #{"type": ..., "x": ..., "y": ..., "impact_frame": ...}
         
         self.tile_type_spirit_sub= {
             "no_collision_terrain": None,
@@ -181,6 +187,17 @@ class Game:
                         else:
                             self.props[tile_y*8+random.randint(1,7)]+= [["snow_rock", tile_x*8+random.randint(1,7), str(random.randint(1,4))]]
         
+
+
+        self.portal_spawnable_tile= []
+        for y in range(239):
+            for x in range(215):
+                tile= pyxel.tilemaps[0].pget(x, y)
+                for type_of_tile in self.tile_type:
+                    if self.tile_id_collision[type_of_tile].count(tile)==1:
+                        if ["no_collision_terrain", "path", "ice"].count(type_of_tile)==1:
+                            self.portal_spawnable_tile.append((x, y))
+                        break
         
         self.spirit_particles= []
         
@@ -274,7 +291,7 @@ class Game:
 
         if self.player["cooldown"]==True and pyxel.frame_count-self.player["cooldown_start_frame"]>6:
             self.player["cooldown"]= False
-        else:
+        else: # UPDATE UI --------------------------------------------------------------
             if pyxel.mouse_wheel!=0 and self.state != STATE_REAL:
                 self.player["active_attack"]= self.player["active_slots"][(self.player["active_slots"].index(self.player["active_attack"])+pyxel.mouse_wheel)%3]
 
@@ -310,7 +327,10 @@ class Game:
                             self.player[selected_slot_in][selected_slot_id], self.player[slot_at_mouse_in][slot_at_mouse_id]= self.player[slot_at_mouse_in][slot_at_mouse_id], self.player[selected_slot_in][selected_slot_id]
                             self.player["selected_slot"]= [None, None]
                             if self.player["active_slots"].count(self.player["active_attack"])==0:
-                                self.player["active_attack"]= None
+                                if self.player["active_slots"].count(None)==0:
+                                    self.player["active_attack"]= self.player["active_slots"][0]
+                                else:
+                                    self.player["active_attack"]= None
                     break
             
             for i in range(3):
@@ -325,8 +345,13 @@ class Game:
                             self.player[selected_slot_in][selected_slot_id], self.player[slot_at_mouse_in][slot_at_mouse_id]= self.player[slot_at_mouse_in][slot_at_mouse_id], self.player[selected_slot_in][selected_slot_id]
                             self.player["selected_slot"]= [None, None]
                             if self.player["active_slots"].count(self.player["active_attack"])==0:
-                                self.player["active_attack"]= None
+                                if self.player["active_slots"].count(None)==0:
+                                    self.player["active_attack"]= self.player["active_slots"][0]
+                                else:
+                                    self.player["active_attack"]= None
                     break
+        
+        self.qol_loot_ui= [l for l in self.qol_loot_ui if pyxel.frame_count-l["obtention_frame"]<150]
         
         # animation du joueur
         if move != (0, 0):
@@ -518,6 +543,12 @@ class Game:
     # ============================================================
 
     def update_real(self):
+        if pyxel.frame_count%1800==0:
+            self.portals= [p for p in self.portals if p["type"]!="portal"]
+            for i in range(30):
+                tile= random.choice(self.portal_spawnable_tile)
+                self.portals.append({"x": tile[0]*8-120, "y": tile[1]*8-120, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT})
+        
         if pyxel.frame_count % 90 == 0:
             # Gain de foi progressive
             if self.player["faith"] <= 100:
@@ -613,7 +644,8 @@ class Game:
                         "dx": dx,
                         "dy": dy,
                         "spd": 3,
-                        "life": 40
+                        "life": 40,
+                        "type": self.player["active_attack"]
                     })
                 
                 elif self.attack_ui[self.player["active_attack"]]["type"]=="closed":
@@ -645,34 +677,35 @@ class Game:
         # -------------------------------
         for i in range(len(self.monsters)):
             m= self.monsters[i]
-            # contact joueur
-            if self.dist(self.player, m, "x", "y") < 6:
-                if self.player["immortality"]==False:
-                    if self.player["hp"]>0:
-                        self.player["hp"] -= 10
-                    self.player["immortality"]=True
-                    self.player["immortality_start_frame"]= pyxel.frame_count
-            else:
-                path= self.monster_pathfinding(m)
-                portal= self.portals[self.player["portal_id"]]
-                u, v= portal["x"]//8-2, portal["y"]//8-2
-                if i==0:
-                    self.temp= path
-                if path!=None:
-                    if len(path)>1:
-                        path= path[1:]
-                        m["x"] += ((path[0][0]+u)-(m["x"]//8+16))* m["spd"]
-                        m["y"] += ((path[0][1]+v)-(m["y"]//8+16)) * m["spd"]
-                    else:
-                        dx = 1 if self.player["x"] > m["x"] else -1 if self.player["x"] < m["x"] else 0
-                        dy = 1 if self.player["y"] > m["y"] else -1 if self.player["y"] < m["y"] else 0
-                        m["x"] += dx * m["spd"]
-                        m["y"] += dy * m["spd"]
-
-                    m["anim"] = (pyxel.frame_count // 10) % 2
+            if not m["stun"]:
+                # contact joueur
+                if self.dist(self.player, m, "x", "y") < 6:
+                    if self.player["immortality"]==False:
+                        if self.player["hp"]>0:
+                            self.player["hp"] -= 10
+                        self.player["immortality"]=True
+                        self.player["immortality_start_frame"]= pyxel.frame_count
                 else:
-                    if self.portals[self.player["portal_id"]]["start_time"]==pyxel.frame_count:
-                        self.monsters= self.monsters[:i]+self.monsters[i:]
+                    path= self.monster_pathfinding(m)
+                    portal= self.portals[self.player["portal_id"]]
+                    u, v= portal["x"]//8-2, portal["y"]//8-2
+                    if i==0:
+                        self.temp= path
+                    if path!=None:
+                        if len(path)>1:
+                            path= path[1:]
+                            m["x"] += ((path[0][0]+u)-(m["x"]//8+16))* m["spd"]
+                            m["y"] += ((path[0][1]+v)-(m["y"]//8+16)) * m["spd"]
+                        else:
+                            dx = 1 if self.player["x"] > m["x"] else -1 if self.player["x"] < m["x"] else 0
+                            dy = 1 if self.player["y"] > m["y"] else -1 if self.player["y"] < m["y"] else 0
+                            m["x"] += dx * m["spd"]
+                            m["y"] += dy * m["spd"]
+
+                        m["anim"] = (pyxel.frame_count // 10) % 2
+                    else:
+                        if self.portals[self.player["portal_id"]]["start_time"]==pyxel.frame_count:
+                            self.monsters= self.monsters[:i]+self.monsters[i:]
                                 
                         
 
@@ -682,13 +715,82 @@ class Game:
         for p in self.projectiles:
             for m in self.monsters:
                 if self.dist(p, m) < 6:
-                    m["hp"] -= 1
+                    if p["type"]=="poison_bomb":
+                        m["hp"] -= 1
+                        self.projectile_info_impact.append({
+                        "x": p["x"],
+                        "y": p["y"],
+                        "impact_frame": pyxel.frame_count,
+                        "type": "poison_bomb"
+                    })
+                    elif p["type"]=="cryogenis":
+                        m["hp"] -= 0.1
+                        temp= False
+                        for p2 in self.projectile_info_impact:
+                            if self.dist(p, p2)<6:
+                                temp= True
+                                p2["impact_frame"]= pyxel.frame_count
+                                break
+                        if not temp:
+                            self.projectile_info_impact.append({
+                            "x": p["x"],
+                            "y": p["y"],
+                            "impact_frame": pyxel.frame_count,
+                            "type": "cryogenis"
+                        })
+                    else:
+                        m["hp"] -= 1
                     p["life"] = 0
                     self.spawn_hit_particles(m["x"], m["y"])
+                    
+        for p in self.projectile_info_impact:
+            for m in self.monsters:
+                
+                if p["type"]=="poison_bomb":
+                    if self.dist(p, m) < 10:
+                        m["hp"] -= 0.01
+                elif p["type"]=="cryogenis":
+                    if self.dist(p, m) < 6:
+                        if pyxel.frame_count-p["impact_frame"]<self.attack_ui[p["type"]]["damage_frame"]-1:
+                            m["stun"]= True
+                        else:
+                            m["stun"]= False
+                        #self.spawn_hit_particles(m["x"], m["y"])
+
 
         # nettoyer
+        regen_faith_wkill= len(self.monsters)
+        self.projectile_info_impact = [p for p in self.projectile_info_impact if pyxel.frame_count-p["impact_frame"]<self.attack_ui[p["type"]]["damage_frame"]]
         self.projectiles = [p for p in self.projectiles if p["life"] > 0]
         self.monsters = [m for m in self.monsters if m["hp"] > 0]
+        
+        # régénération d'un peu de faith en tuant un monstre + loot
+        if len(self.monsters)<regen_faith_wkill:
+            monster_killed_at_frame= regen_faith_wkill-len(self.monsters)
+            self.player["faith"]+= monster_killed_at_frame*5
+            for i in range(monster_killed_at_frame):
+                if self.player["inventory"].count(None)>0:
+                    rd= random.randint(0, 100)
+                    if rd>97:
+                        self.player["inventory"][self.player["inventory"].index(None)]= "poison_bomb"
+                        self.qol_loot_ui.append({
+                            "type": "poison_bomb",
+                            "obtention_frame": pyxel.frame_count
+                        })
+                    elif rd>94:
+                        self.player["inventory"][self.player["inventory"].index(None)]= "cryogenis"
+                        self.qol_loot_ui.append({
+                            "type": "cryogenis",
+                            "obtention_frame": pyxel.frame_count
+                        })
+                    elif rd>90:
+                        self.player["inventory"][self.player["inventory"].index(None)]= "sword"
+                        self.qol_loot_ui.append({
+                            "type": "sword",
+                            "obtention_frame": pyxel.frame_count
+                        })
+            if self.player["faith"]>100:
+                self.player["faith"]= 100
 
         # -------------------------------
         # PURIFICATION DES NŒUDS SPIRITUELS
@@ -809,7 +911,8 @@ class Game:
                         "dx": dx,
                         "dy": dy,
                         "spd": 3,
-                        "life": 40
+                        "life": 40,
+                        "type": self.player["active_attack"]
                     })
                 
                 elif self.attack_ui[self.player["active_attack"]]["type"]=="closed":
@@ -841,34 +944,35 @@ class Game:
                         
         for i in range(len(self.monsters)):
             m= self.monsters[i]
-            # contact joueur
-            if self.dist(self.player, m, "x_spirit", "y_spirit") < 6:
-                if self.player["immortality"]==False:
-                    if self.player["hp"]>0:
-                        self.player["hp"] -= 10
-                    self.player["immortality"]=True
-                    self.player["immortality_start_frame"]= pyxel.frame_count
-            else:
-                path= self.monster_pathfinding(m)
-                mine= self.mine_path[portal["id"]]
-                u, v= mine["x"]//8-16, mine["y"]//8-16
-                if i==0:
-                    self.temp= path
-                if path!=None:
-                    if len(path)>1:
-                        path= path[1:]
-                        m["x"] += ((path[0][0]+u)-(m["x"]//8))* m["spd"]
-                        m["y"] += ((path[0][1]+v)-(m["y"]//8)) * m["spd"]
-                    else:
-                        dx = 1 if self.player["x_spirit"] > m["x"] else -1 if self.player["x_spirit"] < m["x"] else 0
-                        dy = 1 if self.player["y_spirit"] > m["y"] else -1 if self.player["y_spirit"] < m["y"] else 0
-                        m["x"] += dx * m["spd"]
-                        m["y"] += dy * m["spd"]
-
-                    m["anim"] = (pyxel.frame_count // 10) % 2
+            if not m["stun"]:
+                # contact joueur
+                if self.dist(self.player, m, "x_spirit", "y_spirit") < 6:
+                    if self.player["immortality"]==False:
+                        if self.player["hp"]>0:
+                            self.player["hp"] -= 10
+                        self.player["immortality"]=True
+                        self.player["immortality_start_frame"]= pyxel.frame_count
                 else:
-                    if self.portals[self.player["portal_id"]]["start_time"]==pyxel.frame_count:
-                        self.monsters= self.monsters[:i]+self.monsters[i:]
+                    path= self.monster_pathfinding(m)
+                    mine= self.mine_path[portal["id"]]
+                    u, v= mine["x"]//8-16, mine["y"]//8-16
+                    if i==0:
+                        self.temp= path
+                    if path!=None:
+                        if len(path)>1:
+                            path= path[1:]
+                            m["x"] += ((path[0][0]+u)-(m["x"]//8))* m["spd"]
+                            m["y"] += ((path[0][1]+v)-(m["y"]//8)) * m["spd"]
+                        else:
+                            dx = 1 if self.player["x_spirit"] > m["x"] else -1 if self.player["x_spirit"] < m["x"] else 0
+                            dy = 1 if self.player["y_spirit"] > m["y"] else -1 if self.player["y_spirit"] < m["y"] else 0
+                            m["x"] += dx * m["spd"]
+                            m["y"] += dy * m["spd"]
+
+                        m["anim"] = (pyxel.frame_count // 10) % 2
+                    else:
+                        if self.portals[self.player["portal_id"]]["start_time"]==pyxel.frame_count:
+                            self.monsters= self.monsters[:i]+self.monsters[i:]
             
 
         # -------------------------------
@@ -877,13 +981,81 @@ class Game:
         for p in self.projectiles:
             for m in self.monsters:
                 if self.dist(p, m) < 6:
-                    m["hp"] -= 1
+                    if p["type"]=="poison_bomb":
+                        m["hp"] -= 1
+                        self.projectile_info_impact.append({
+                        "x": p["x"],
+                        "y": p["y"],
+                        "impact_frame": pyxel.frame_count,
+                        "type": "poison_bomb"
+                    })
+                    elif p["type"]=="cryogenis":
+                        m["hp"] -= 0.1
+                        temp= False
+                        for p2 in self.projectile_info_impact:
+                            if self.dist(p, p2)<6:
+                                temp= True
+                                p2["impact_frame"]= pyxel.frame_count
+                                break
+                        if not temp:
+                            self.projectile_info_impact.append({
+                            "x": p["x"],
+                            "y": p["y"],
+                            "impact_frame": pyxel.frame_count,
+                            "type": "cryogenis"
+                        })
+                    else:
+                        m["hp"] -= 1
                     p["life"] = 0
                     self.spawn_hit_particles(m["x"], m["y"])
+                    
+        for p in self.projectile_info_impact:
+            for m in self.monsters:
+                if p["type"]=="poison_bomb":
+                    if self.dist(p, m) < 10:
+                        m["hp"] -= 0.01
+                elif p["type"]=="cryogenis":
+                    if self.dist(p, m) < 6:
+                        if pyxel.frame_count-p["impact_frame"]<self.attack_ui[p["type"]]["damage_frame"]-1:
+                            m["stun"]= True
+                        else:
+                            m["stun"]= False
+                        #self.spawn_hit_particles(m["x"], m["y"])
 
         # nettoyer
+        regen_faith_wkill= len(self.monsters)
+        self.projectile_info_impact = [p for p in self.projectile_info_impact if pyxel.frame_count-p["impact_frame"]<self.attack_ui[p["type"]]["damage_frame"]]
         self.projectiles = [p for p in self.projectiles if p["life"] > 0]
         self.monsters = [m for m in self.monsters if m["hp"] > 0]
+        
+        # régénération d'un peu de faith en tuant un monstre + loot
+        if len(self.monsters)<regen_faith_wkill:
+            monster_killed_at_frame= regen_faith_wkill-len(self.monsters)
+            self.player["faith"]+= monster_killed_at_frame*5
+            for i in range(monster_killed_at_frame):
+                if self.player["inventory"].count(None)>0:
+                    rd= random.randint(0, 100)
+                    if rd>97:
+                        self.player["inventory"][self.player["inventory"].index(None)]= "poison_bomb"
+                        self.qol_loot_ui.append({
+                            "type": "poison_bomb",
+                            "obtention_frame": pyxel.frame_count
+                        })
+                    elif rd>94:
+                        self.player["inventory"][self.player["inventory"].index(None)]= "cryogenis"
+                        self.qol_loot_ui.append({
+                            "type": "cryogenis",
+                            "obtention_frame": pyxel.frame_count
+                        })
+                    elif rd>90:
+                        self.player["inventory"][self.player["inventory"].index(None)]= "sword"
+                        self.qol_loot_ui.append({
+                            "type": "sword",
+                            "obtention_frame": pyxel.frame_count
+                        })
+            if self.player["faith"]>100:
+                self.player["faith"]= 100
+        
 
         # -------------------------------
         # PURIFICATION DES NŒUDS SPIRITUELS
@@ -1170,6 +1342,13 @@ class Game:
         for p in self.projectiles:
             pyxel.circ(p["x"]-self.player["x"]+128, p["y"]-self.player["y"]+128, 1, 7)
             
+            
+        for p in self.projectile_info_impact:
+            if p["type"]=="poison_bomb":
+                pyxel.blt(p["x"]-self.player["x"]+120, p["y"]-self.player["y"]+120, 2, self.effect_ui[p["type"]]["x"]+((pyxel.frame_count-p["impact_frame"])//3)*16, self.effect_ui[p["type"]]["y"], self.effect_ui[p["type"]]["u"], self.effect_ui[p["type"]]["v"], self.effect_ui[p["type"]]["col"])
+            elif p["type"]=="cryogenis":
+                pyxel.blt(p["x"]-self.player["x"]+120, p["y"]-self.player["y"]+120, 2, self.effect_ui[p["type"]]["x"], self.effect_ui[p["type"]]["y"], self.effect_ui[p["type"]]["u"], self.effect_ui[p["type"]]["v"], self.effect_ui[p["type"]]["col"])
+            
         if self.player["active_attack"]!=None:
             if self.attack_ui[self.player["active_attack"]]["type"]=="closed":
                 clipping= 0
@@ -1223,15 +1402,22 @@ class Game:
             col = 10 if n["purified"] else 8
             pyxel.circ(n["x"]-self.player["x_spirit"]+128, n["y"]-self.player["y_spirit"]+128, 3, col)
 
-        
         for m in self.monsters:
             col = 3 if m["anim"] == 0 else 6
             pyxel.circ(m["x"]-self.player["x_spirit"]+128, m["y"]-self.player["y_spirit"]+128, 3, col)
             #print(m)
-
+        
+        
+        for p in self.projectile_info_impact:
+            if p["type"]=="poison_bomb":
+                pyxel.blt(p["x"]-self.player["x_spirit"]+120, p["y"]-self.player["y_spirit"]+120, 2, self.effect_ui[p["type"]]["x"]+((pyxel.frame_count-p["impact_frame"])//3)*16, self.effect_ui[p["type"]]["y"], self.effect_ui[p["type"]]["u"], self.effect_ui[p["type"]]["v"], self.effect_ui[p["type"]]["col"])
+            elif p["type"]=="cryogenis":
+                pyxel.blt(p["x"]-self.player["x_spirit"]+120, p["y"]-self.player["y_spirit"]+120, 2, self.effect_ui[p["type"]]["x"], self.effect_ui[p["type"]]["y"], self.effect_ui[p["type"]]["u"], self.effect_ui[p["type"]]["v"], self.effect_ui[p["type"]]["col"])
+            
         # Projectiles
         for p in self.projectiles:
             pyxel.circ(p["x"]-self.player["x_spirit"]+128, p["y"]-self.player["y_spirit"]+128, 1, 7)
+        
             
         # Joueur
         col = 14 if self.player["anim"] == 0 else 7
@@ -1378,6 +1564,11 @@ class Game:
                 index= (self.player["active_slots"].index(self.player["active_attack"])+(pyxel.mouse_wheel*(int(self.ingame_hud.count(self.hud)==1))))%3
                 pyxel.blt(WIDTH-112-3+self.attack_ui_slot[index][0], HEIGHT-60-3+self.attack_ui_slot[index][1], 2, 0, 128, 24, 24, 4)
     
+        for i in range(len(self.qol_loot_ui)):
+            loot= self.qol_loot_ui[i]
+            pyxel.text(25, HEIGHT - 15 + i*18, str(loot["type"]), 7)
+            pyxel.blt(5, HEIGHT - 20 + i*18, 2, self.attack_ui[loot["type"]]["x"], self.attack_ui[loot["type"]]["y"], 16, 16, 7)
+    
         #pyxel.text(5, HEIGHT - 15, f"HP:{self.player['hp']}", 7)
         #pyxel.text(50, HEIGHT - 15, f"Faith:{self.player['faith']}", 7)
 
@@ -1396,6 +1587,7 @@ class Game:
 
 
 Game()
+
 
 
 
