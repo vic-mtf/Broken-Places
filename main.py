@@ -10,7 +10,7 @@ STATE_SPIRIT_SUB_ZONE= 2
 
 class Game:
     def __init__(self):
-        pyxel.init(WIDTH, HEIGHT, title="Broken Places", fps= 30, quit_key= pyxel.KEY_RCTRL, display_scale= 4)
+        pyxel.init(WIDTH, HEIGHT, title="Broken Places", fps= 30, quit_key= pyxel.KEY_RCTRL, display_scale= 3)
         pyxel.load("5.pyxres")
         pyxel.mouse(True)
         self.temp= []
@@ -33,8 +33,8 @@ class Game:
 
         # Player
         self.player = {
-            "x": 144,  #156*8-128,
-            "y": 416, #200*8-128,
+            "x": 38*8-128,
+            "y": 18*8-128,
             "x_spirit": 100,
             "y_spirit": 100,
             "vx": 0,
@@ -60,15 +60,15 @@ class Game:
         self.portals = [
             {"x": 144, "y": 416, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT},
             {"x": 123*8-128, "y": 128*8-64, "purified": False, "type": "portal", "start_time": 0, "state": STATE_SPIRIT},
-            {"x": 410, "y": 1304, "purified": False, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
-            {"x": 1086, "y": 1444, "purified": False, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
-            {"x": 1464, "y": 1082, "purified": False, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
-            {"x": 528, "y": 544, "purified": False, "type": "mansion", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
-            {"x": 604, "y": 460, "purified": False, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 3},
-            {"x": 402, "y": 928, "purified": False, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 1},
+            {"x": 410, "y": 1304, "purified": True, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
+            {"x": 1086, "y": 1444, "purified": True, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
+            {"x": 1464, "y": 1082, "purified": True, "type": "lighthouse", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
+            {"x": 528, "y": 544, "purified": True, "type": "mansion", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE},
+            {"x": 604, "y": 460, "purified": True, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 3},
+            {"x": 402, "y": 928, "purified": True, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 1},
             {"x": 336, "y": 304, "purified": False, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 0},
             {"x": 200, "y": 528, "purified": False, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 0},
-            {"x": 454, "y": 726, "purified": False, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 2}
+            {"x": 454, "y": 726, "purified": True, "type": "mine", "start_time": 0, "state": STATE_SPIRIT_SUB_ZONE, "id": 2}
         ]
         self.mine_path= {
             0: {"x": 128, "y": 128, "l": 640, "h": 512},
@@ -207,13 +207,59 @@ class Game:
         self.projectiles = []
         self.particles = []       # pour effets d’impact visibles
         self.memory_fragments = []
+        self.save= {}
 
         # Ritual
         self.ritual_active = False
         self.ritual_progress = 0
 
         pyxel.run(self.update, self.draw)
-
+    
+    def load_save(self):
+        for key in self.save:
+            if key=="hud":
+                self.hud= self.save[key]
+            elif key=="player":
+                self.player= self.save[key]
+            elif key=="state":
+                self.state= self.save[key]
+            elif key=="portals":
+                self.portals= self.save[key]
+            elif key=="monsters":
+                self.monsters= self.save[key]
+        
+    
+    def save_game(self):
+        self.save= {
+            "hud": None,
+            "player": {
+                "x": self.player["x"],
+                "y": self.player["y"],
+                "x_spirit": self.player["x_spirit"],
+                "y_spirit": self.player["y_spirit"],
+                "vx": 0,
+                "vy": 0,
+                "hp": self.player["hp"],
+                "faith": self.player["faith"],
+                "inventory": self.player["inventory"],
+                "active_slots": self.player["active_slots"],
+                "anim": 0,  # animation frame
+                "portal_id": self.player["portal_id"],
+                "immortality": False,
+                "immortality_start_frame": 0,
+                "cooldown": False,
+                "cooldown_start_frame": 0,
+                "active_attack": self.player["active_attack"],
+                "slot_at_mouse": [None, None], # [ui_of_slot, slot_id]
+                "selected_slot": [None, None]  # [ui_of_slot, slot_id]
+            },
+        
+        "state": self.state,
+        "portals": self.portals,
+        "monsters": self.monsters
+    }
+            
+    
     # ============================================================
     # UPDATE
     # ============================================================
@@ -294,7 +340,10 @@ class Game:
         else: # UPDATE UI --------------------------------------------------------------
             if pyxel.mouse_wheel!=0 and self.state != STATE_REAL:
                 self.player["active_attack"]= self.player["active_slots"][(self.player["active_slots"].index(self.player["active_attack"])+pyxel.mouse_wheel)%3]
-
+        
+        if self.player["hp"]<=0:
+            self.hud= "dead"
+        
         if pyxel.btnp(pyxel.KEY_E, 15, 1):
             if self.hud==None:
                 self.hud= "inventory"
@@ -375,6 +424,11 @@ class Game:
                             self.hud= None
                             self.player["selected_slot"]= [None, None]
                             self.player["slot_at_mouse"]= [None, None]
+                        elif i==2:
+                            self.save_game()
+                            pyxel.quit()
+                        elif i==3:
+                            self.save_game()
                         else:
                             self.player["selected_slot"]= ["pause", i]
                     break
@@ -394,6 +448,19 @@ class Game:
                             self.hud="pause"
                             self.player["selected_slot"]= [None, None]
                             self.player["slot_at_mouse"]= [None, None]
+                    break
+                
+        elif self.hud=="dead":
+            for i in range(2):
+                if pyxel.mouse_x>62+i*100 and pyxel.mouse_x<94+i*100 and pyxel.mouse_y>170 and pyxel.mouse_y<186:
+                    self.player["slot_at_mouse"]= ["dead", i]
+                    if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT, 15, 1):
+                        if i==1:
+                            pyxel.quit()
+                        else:
+                            self.hud= None
+                            self.load_save()
+                            
                     break
     
     # ============================================================
@@ -694,13 +761,15 @@ class Game:
                     if path!=None:
                         if len(path)>1:
                             path= path[1:]
-                            m["x"] += ((path[0][0]+u)-(m["x"]//8+16))* m["spd"]
-                            m["y"] += ((path[0][1]+v)-(m["y"]//8+16)) * m["spd"]
+                            m["vx"]= ((path[0][0]+u)-(m["x"]//8+16))* m["spd"]
+                            m["vy"]= ((path[0][1]+v)-(m["y"]//8+16)) * m["spd"]
+                            m["x"] += m["vx"]
+                            m["y"] += m["vy"]
                         else:
-                            dx = 1 if self.player["x"] > m["x"] else -1 if self.player["x"] < m["x"] else 0
-                            dy = 1 if self.player["y"] > m["y"] else -1 if self.player["y"] < m["y"] else 0
-                            m["x"] += dx * m["spd"]
-                            m["y"] += dy * m["spd"]
+                            m["vx"] = 1 if self.player["x"] > m["x"] else -1 if self.player["x"] < m["x"] else 0
+                            m["vy"] = 1 if self.player["y"] > m["y"] else -1 if self.player["y"] < m["y"] else 0
+                            m["x"] += m["vx"] * m["spd"]
+                            m["y"] += m["vy"] * m["spd"]
 
                         m["anim"] = (pyxel.frame_count // 10) % 2
                     else:
@@ -961,13 +1030,15 @@ class Game:
                     if path!=None:
                         if len(path)>1:
                             path= path[1:]
-                            m["x"] += ((path[0][0]+u)-(m["x"]//8))* m["spd"]
-                            m["y"] += ((path[0][1]+v)-(m["y"]//8)) * m["spd"]
+                            m["vx"]= ((path[0][0]+u)-(m["x"]//8))* m["spd"]
+                            m["vy"]= ((path[0][1]+v)-(m["y"]//8)) * m["spd"]
+                            m["x"] += m["vx"]
+                            m["y"] += m["vy"]
                         else:
-                            dx = 1 if self.player["x_spirit"] > m["x"] else -1 if self.player["x_spirit"] < m["x"] else 0
-                            dy = 1 if self.player["y_spirit"] > m["y"] else -1 if self.player["y_spirit"] < m["y"] else 0
-                            m["x"] += dx * m["spd"]
-                            m["y"] += dy * m["spd"]
+                            m["vx"] = 1 if self.player["x_spirit"] > m["x"] else -1 if self.player["x_spirit"] < m["x"] else 0
+                            m["vy"] = 1 if self.player["y_spirit"] > m["y"] else -1 if self.player["y_spirit"] < m["y"] else 0
+                            m["x"] += m["vx"] * m["spd"]
+                            m["y"] += m["vy"] * m["spd"]
 
                         m["anim"] = (pyxel.frame_count // 10) % 2
                     else:
@@ -1151,7 +1222,7 @@ class Game:
             monster_tile= random.choice(spawnable_tile_list)
             index= spawnable_tile_list.index(monster_tile)
             spawnable_tile_list= spawnable_tile_list[:index]+spawnable_tile_list[index:]
-            self.monsters.append({"x": monster_tile[0], "y": monster_tile[1], "hp": 4, "spd": 0.6, "anim": 0, "stun": False, "stun_start_frame": 0, "stun_type": None})
+            self.monsters.append({"x": monster_tile[0], "y": monster_tile[1], "vx": 1, "vy": 1, "hp": 4, "spd": 0.6, "anim": 0, "stun": False, "stun_start_frame": 0, "stun_type": None})
         
 
     def enter_spirit_sub_zone(self):
@@ -1186,7 +1257,7 @@ class Game:
             monster_tile= random.choice(spawnable_tile_list)
             index= spawnable_tile_list.index(monster_tile)
             spawnable_tile_list= spawnable_tile_list[:index]+spawnable_tile_list[index:]
-            self.monsters.append({"x": monster_tile[0]*8, "y": monster_tile[1]*8 , "hp": 4, "spd": 0.6, "anim": 0, "stun": False, "stun_start_frame": 0, "stun_type": None})
+            self.monsters.append({"x": monster_tile[0]*8, "y": monster_tile[1]*8 , "vx": 1, "vy": 1, "hp": 4, "spd": 0.6, "anim": 0, "stun": False, "stun_start_frame": 0, "stun_type": None})
 
     def exit_spirit(self, failed):
         self.state_entry_frame= pyxel.frame_count+1
@@ -1336,8 +1407,10 @@ class Game:
         self.draw_props()
         
         for m in self.monsters:
-            col = 3 if m["anim"] == 0 else 6
-            pyxel.circ(m["x"]-self.player["x"]+128, m["y"]-self.player["y"]+128, 3, col)
+            if (abs(m["vx"]), abs(m["vy"]))!=(1,1):
+                pyxel.blt(m["x"]-self.player["x"]+124, m["y"]-self.player["y"]+124, 1, 56+8*m["vx"]*(5/3), 16+8*m["vy"]*(5/3), 8, 8, 7)
+            else:
+                pyxel.blt(m["x"]-self.player["x"]+124, m["y"]-self.player["y"]+124, 1, 56, 24, 8, 8, 7)
             
         for p in self.projectiles:
             pyxel.circ(p["x"]-self.player["x"]+128, p["y"]-self.player["y"]+128, 1, 7)
@@ -1403,9 +1476,10 @@ class Game:
             pyxel.circ(n["x"]-self.player["x_spirit"]+128, n["y"]-self.player["y_spirit"]+128, 3, col)
 
         for m in self.monsters:
-            col = 3 if m["anim"] == 0 else 6
-            pyxel.circ(m["x"]-self.player["x_spirit"]+128, m["y"]-self.player["y_spirit"]+128, 3, col)
-            #print(m)
+            if (abs(m["vx"]), abs(m["vy"]))!=(1,1):
+                pyxel.blt(m["x"]-self.player["x_spirit"]+124, m["y"]-self.player["y_spirit"]+124, 1, 56+8*m["vx"]*(5/3), 16+8*m["vy"]*(5/3), 8, 8, 7)
+            else:
+                pyxel.blt(m["x"]-self.player["x_spirit"]+124, m["y"]-self.player["y_spirit"]+124, 1, 56, 24, 8, 8, 7)
         
         
         for p in self.projectile_info_impact:
@@ -1553,6 +1627,41 @@ class Game:
                         pyxel.blt(40+x*168, 48+y*152, 2, 176+x*16, 0+y*16, 8, 8, 0)
                         
                 pyxel.rect(48, 56, 160, 144, 1)
+                
+            elif self.hud=="dead":
+                for i in range(20):
+                    pyxel.blt(48+i*8, 48, 2, 184, 0, 8, 8)
+                    pyxel.blt(48+i*8, 56+18*8, 2, 184, 16, 8, 8)
+                    
+                for i in range(18):
+                    pyxel.blt(40, 56+i*8, 2, 176, 8, 8, 8)
+                    pyxel.blt(48+20*8, 56+i*8, 2, 192, 8, 8, 8)
+                    
+                for x in range(2):
+                    for y in range(2):
+                        pyxel.blt(40+x*168, 48+y*152, 2, 176+x*16, 0+y*16, 8, 8, 0)
+                        
+                pyxel.rect(48, 56, 160, 144, 1)
+                
+                pyxel.blt(108, 66, 2, 56, 128, 40, 24, 10)
+                
+                for x in range(2):
+                    ui= self.pause_ui_text_id[x*4]
+                    pyxel.blt(64+x*105, 174, 2, ui[0], ui[1], ui[2], 8, 3)
+                    
+                slot_id= self.player["slot_at_mouse"][1]
+                if slot_id!=None:
+                    ui= self.pause_ui_text_id[slot_id*4]
+                    pyxel.rectb(62+slot_id*105, 172, self.pause_ui_text_id[slot_id*4][2]+4, 13, 5)
+                    pyxel.rect(63+slot_id*105, 173, self.pause_ui_text_id[slot_id*4][2]+2, 11, 12)
+                    
+                    pyxel.blt(64+slot_id*105, 174, 2, ui[0]+64, ui[1], ui[2], 8, 3)
+                
+                
+                
+                
+                
+                
                     
         for i in range(3):
             attack_name= self.player["active_slots"][i]
@@ -1587,6 +1696,7 @@ class Game:
 
 
 Game()
+
 
 
 
