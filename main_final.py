@@ -44,10 +44,10 @@ class PlayerData:
         self.y_spirit = 100
         self.vx = 0
         self.vy = 0
-        self.hp = 100
-        self.max_hp = 100
-        self.faith = 100
-        self.max_faith = 100
+        self.hp = 120
+        self.max_hp = 120
+        self.faith = 120
+        self.max_faith = 120
         self.inventory = [None] * 12
         self.active_slots = ["sword", None, None]
         self.anim = 0
@@ -199,9 +199,9 @@ class CombatSystem:
         ]
 
         self.attack_ui = {
-            "sword": {"type": "closed", "x": 16, "y": 112, "zone": 1, "stun_time": 0, "damage_frame": 1},
-            "cryogenis": {"type": "ranged", "x": 0, "y": 112, "zone": 1, "stun_time": 10, "damage_frame": 90},
-            "poison_bomb": {"type": "ranged", "x": 32, "y": 112, "zone": 8, "stun_time": 0, "damage_frame": 24},
+            "sword": {"type": "closed", "x": 16, "y": 112, "zone": 1, "stun_time": 0, "damage_frame": 1, "cooldown": 3},
+            "cryogenis": {"type": "ranged", "x": 0, "y": 112, "zone": 1, "stun_time": 10, "damage_frame": 90, "cooldown": 10},
+            "poison_bomb": {"type": "ranged", "x": 32, "y": 112, "zone": 8, "stun_time": 0, "damage_frame": 24, "cooldown": 8},
         }
 
         self.projectile_info_impact = []
@@ -295,6 +295,21 @@ class Game:
                 self.world.portals = self.save[key]
             elif key == "monsters":
                 self.monsters = self.save[key]
+
+
+    def restart_game(self):
+        pyxel.stop()
+        self.player = PlayerData()
+        self.world = WorldConfig()
+        self.state = STATE_REAL
+        self.state_entry_frame = pyxel.frame_count
+        self.monsters = []
+        self.spirit_particles = []
+        self.spirit_nodes = []
+        self.projectiles = []
+        self.particles = []
+        self.memory_fragments = []
+        self.ui.hud = None
 
     def save_game(self):
         self.save = {
@@ -457,11 +472,9 @@ class Game:
         ):
             self.player.immortality = False
 
-        if (
-            self.player.cooldown == True
-            and pyxel.frame_count - self.player.cooldown_start_frame > 6
-        ):
-            self.player.cooldown = False
+        if self.player.cooldown == True:
+            if pyxel.frame_count - self.player.cooldown_start_frame > 6:
+                self.player.cooldown = False
         else:  # UPDATE UI --------------------------------------------------------------
             if pyxel.mouse_wheel != 0 and self.state != STATE_REAL:
                 self.player.active_attack = self.player.active_slots[
@@ -472,8 +485,9 @@ class Game:
                     % 3
                 ]
 
-        if self.player.hp <= 0:
+        if self.player.hp <= 0 and self.ui.hud != "dead":
             self.ui.hud = "dead"
+            pyxel.stop()
 
         if pyxel.btnp(pyxel.KEY_E, 15, 1):
             if self.ui.hud == None:
@@ -656,8 +670,7 @@ class Game:
                         if i == 1:
                             pyxel.quit()
                         else:
-                            self.ui.hud = None
-                            self.load_save()
+                            self.restart_game()
 
                     break
 
@@ -833,7 +846,7 @@ class Game:
         if pyxel.frame_count % 90 == 0:
             # Gain de foi progressive
             if self.player.faith <= 100:
-                self.player.faith += 1
+                self.player.faith += 2
             # Gain de vie progressive
             if self.player.hp < 98:
                 self.player.hp += 3
@@ -936,7 +949,7 @@ class Game:
                         }
 
                         if self.dist(tmp, m, "x", "y") < 12:
-                            m["hp"] -= 0.5
+                            m["hp"] -= 2
                             self.spawn_hit_particles(m["x"], m["y"])
 
         # -------------------------------
@@ -957,9 +970,10 @@ class Game:
                 if self.dist(self.player, m, "x", "y") < 6:
                     if self.player.immortality == False:
                         if self.player.hp > 0:
-                            self.player.hp -= 10
+                            self.player.hp -= 6
                         self.player.immortality = True
                         self.player.immortality_start_frame = pyxel.frame_count
+                        pyxel.play(2, 6)
                 else:
                     path = self.monster_pathfinding(m)
                     portal = self.world.portals[self.player.portal_id]
@@ -1002,7 +1016,7 @@ class Game:
             for m in self.monsters:
                 if self.dist(p, m) < 6:
                     if p["type"] == "poison_bomb":
-                        m["hp"] -= 1
+                        m["hp"] -= 2
                         self.projectile_info_impact.append(
                             {
                                 "x": p["x"],
@@ -1012,7 +1026,7 @@ class Game:
                             }
                         )
                     elif p["type"] == "cryogenis":
-                        m["hp"] -= 0.1
+                        m["hp"] -= 1
                         temp = False
                         for p2 in self.projectile_info_impact:
                             if self.dist(p, p2) < 6:
@@ -1038,7 +1052,7 @@ class Game:
 
                 if p["type"] == "poison_bomb":
                     if self.dist(p, m) < 10:
-                        m["hp"] -= 0.01
+                        m["hp"] -= 0.05
                 elif p["type"] == "cryogenis":
                     if self.dist(p, m) < 6:
                         if (
@@ -1064,11 +1078,11 @@ class Game:
         # régénération d'un peu de faith en tuant un monstre + loot
         if len(self.monsters) < regen_faith_wkill:
             monster_killed_at_frame = regen_faith_wkill - len(self.monsters)
-            self.player.faith += monster_killed_at_frame * 5
+            self.player.faith += monster_killed_at_frame * 8
             for i in range(monster_killed_at_frame):
                 if self.player.inventory.count(None) > 0:
                     rd = random.randint(0, 100)
-                    if rd > 97:
+                    if rd > 85:
                         self.player.inventory[
                             self.player.inventory.index(None)
                         ] = "poison_bomb"
@@ -1078,14 +1092,14 @@ class Game:
                                 "obtention_frame": pyxel.frame_count,
                             }
                         )
-                    elif rd > 94:
+                    elif rd > 70:
                         self.player.inventory[
                             self.player.inventory.index(None)
                         ] = "cryogenis"
                         self.ui.qol_loot_ui.append(
                             {"type": "cryogenis", "obtention_frame": pyxel.frame_count}
                         )
-                    elif rd > 90:
+                    elif rd > 50:
                         self.player.inventory[
                             self.player.inventory.index(None)
                         ] = "sword"
@@ -1250,7 +1264,7 @@ class Game:
                         }
 
                         if self.dist(tmp, m, "x_spirit", "y_spirit") < 12:
-                            m["hp"] -= 0.5
+                            m["hp"] -= 2
                             self.spawn_hit_particles(m["x"], m["y"])
 
         # -------------------------------
@@ -1272,9 +1286,10 @@ class Game:
                 if self.dist(self.player, m, "x_spirit", "y_spirit") < 6:
                     if self.player.immortality == False:
                         if self.player.hp > 0:
-                            self.player.hp -= 10
+                            self.player.hp -= 6
                         self.player.immortality = True
                         self.player.immortality_start_frame = pyxel.frame_count
+                        pyxel.play(2, 6)
                 else:
                     path = self.monster_pathfinding(m)
                     mine = self.world.mine_path[portal["id"]]
@@ -1317,7 +1332,7 @@ class Game:
             for m in self.monsters:
                 if self.dist(p, m) < 6:
                     if p["type"] == "poison_bomb":
-                        m["hp"] -= 1
+                        m["hp"] -= 2
                         self.projectile_info_impact.append(
                             {
                                 "x": p["x"],
@@ -1327,7 +1342,7 @@ class Game:
                             }
                         )
                     elif p["type"] == "cryogenis":
-                        m["hp"] -= 0.1
+                        m["hp"] -= 1
                         temp = False
                         for p2 in self.projectile_info_impact:
                             if self.dist(p, p2) < 6:
@@ -1352,7 +1367,7 @@ class Game:
             for m in self.monsters:
                 if p["type"] == "poison_bomb":
                     if self.dist(p, m) < 10:
-                        m["hp"] -= 0.01
+                        m["hp"] -= 0.05
                 elif p["type"] == "cryogenis":
                     if self.dist(p, m) < 6:
                         if (
@@ -1378,11 +1393,11 @@ class Game:
         # régénération d'un peu de faith en tuant un monstre + loot
         if len(self.monsters) < regen_faith_wkill:
             monster_killed_at_frame = regen_faith_wkill - len(self.monsters)
-            self.player.faith += monster_killed_at_frame * 5
+            self.player.faith += monster_killed_at_frame * 8
             for i in range(monster_killed_at_frame):
                 if self.player.inventory.count(None) > 0:
                     rd = random.randint(0, 100)
-                    if rd > 97:
+                    if rd > 85:
                         self.player.inventory[
                             self.player.inventory.index(None)
                         ] = "poison_bomb"
@@ -1392,14 +1407,14 @@ class Game:
                                 "obtention_frame": pyxel.frame_count,
                             }
                         )
-                    elif rd > 94:
+                    elif rd > 70:
                         self.player.inventory[
                             self.player.inventory.index(None)
                         ] = "cryogenis"
                         self.ui.qol_loot_ui.append(
                             {"type": "cryogenis", "obtention_frame": pyxel.frame_count}
                         )
-                    elif rd > 90:
+                    elif rd > 50:
                         self.player.inventory[
                             self.player.inventory.index(None)
                         ] = "sword"
